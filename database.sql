@@ -9,7 +9,7 @@ CREATE TABLE "categories" (
 -- Default categories. You may change these. 🙂
 INSERT INTO "categories"
   ("name")
-  VALUES
+  VALUES 
   ('wild'),
   ('uproarious'),
   ('poignant'),
