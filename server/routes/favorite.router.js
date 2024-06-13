@@ -1,28 +1,57 @@
 const express = require('express');
 const pool = require('../modules/pool');
-const idGenerator = require('../modules/id.generator')();
-const favorite = [{Giphy: 'image1', id: idGenerator.next().value}, 
-                {Giphy: 'image2', id: idGenerator.next().value}];
-
-
 const router = express.Router();
+const axios = require('axios')
 
 // return all favorite images
-router.get('/', (req, res) => {
-  res.send(favorite);
-});
+// router.get('/', (req, res) => {
+//     const sqlText = `SELECT * FROM "favorite" ORDER BY "id"`;
+//     pool.query(sqlText).then(result => {
+//         res.send(result.rows)
+//     }).catch(err => {
+//         console.log(err);
+//         res.sendStatus(500);
+//     })
+// })
+
+router.get("/", (req, res) => {
+  axios.get(`https://api.giphy.com/v1/gifs/trending?api_key=${process.env.GIPHY_API_KEY}&limit=5`)
+  .then((response) => {
+      console.log("Trending GIPHY...", response.data)
+      res.sendStatus(200)
+  })
+  .catch((error) => {
+      console.log('/api/giphy/ is borken', error)
+      res.sendStatus(500)
+  })
+
+ 
+})
+
+
 
 
 // add a new favorite
 router.post('/', (req, res) => {
-  const favoriteToAdd = req.body;
-    favoriteToAdd.id = idGenerator.next().value;
-    favorite.push(favoriteToAdd);
-    res.sendStatus(201);
+  let favorite = req.body
+
+  const queryText = `
+      INSERT INTO "favorite" ("gippy")
+      VALUES ($1)
+  `;
+
+  const values = [favorite.gippy];
+
+  pool.query(queryText, values)
+      .then(result => {
+          res.sendStatus(201); 
+      })
+      .catch(error => {
+          res.sendStatus(500); 
+      });
 });
 
-
-
+  
 
 // update a favorite's associated category
 router.put('/:id', (req, res) => {
@@ -30,35 +59,36 @@ router.put('/:id', (req, res) => {
   const favoriteId = req.params.id;
   const newCategoryId = req.body.category_id;
 
-  let favoriteFound = false;
-  for (let i = 0; i < favorite.length; i++) {
-    if (favorite[i].id == favoriteId) {
-      favorite[i].category_id = newCategoryId;
-      favoriteFound = true;
-      break;
-    }
-  }
+  const queryText = `
+      UPDATE "favorites"
+      SET "category_id" = $1
+      WHERE "id" = $2
+  `;
 
-  if (favoriteFound) {
-    res.sendStatus(200);
-  } else {
-    res.sendStatus(404); // Not Found
-  }
+  const values = [newCategoryId, favoriteId];
+
+  pool.query(queryText, values)
+      .then(result => {
+          if (result.rowCount > 0) {
+              res.sendStatus(200);
+          } else {
+              res.sendStatus(404); 
+          }
+      })
+      .catch(error => {
+          console.log('Error on PUT', error);
+          res.sendStatus(500); 
+      });
 });
-
-
-
 
 router.delete('/:id', (req, res) => {
-  let index = 0;
-  for (const item of favorite) {
-      if (req.params.id == item.id) {
-          favorite.splice(index, 1);
-          break;
-      }
-      index += 1;
-  }
-  res.sendStatus(200);
+      pool.query('DELETE FROM "favorite" WHERE id=$1', [req.params.id]).then((result) => {
+        res.sendStatus(200);
+    }).catch((error) => {
+        console.log('Error on  DELETE', error);
+        res.sendStatus(500);
+    })
 });
+
 
 module.exports = router;
